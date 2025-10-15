@@ -5,7 +5,7 @@ import json
 import random
 import time
 from pathlib import Path
-import tqdm
+from tqdm import tqdm
 
 import numpy as np
 import torch
