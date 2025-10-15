@@ -5,6 +5,7 @@ import json
 import random
 import time
 from pathlib import Path
+import tqdm
 
 import numpy as np
 import torch
@@ -21,18 +22,24 @@ def get_args_parser():
     parser = argparse.ArgumentParser('Set transformer detector', add_help=False)
     parser.add_argument('--lr', default=1e-4, type=float)
     parser.add_argument('--lr_backbone', default=1e-5, type=float)
-    parser.add_argument('--batch_size', default=2, type=int)
+    parser.add_argument('--batch_size', default=4, type=int)
     parser.add_argument('--weight_decay', default=1e-4, type=float)
-    parser.add_argument('--epochs', default=300, type=int)
-    parser.add_argument('--lr_drop', default=200, type=int)
+    parser.add_argument('--epochs', default=10, type=int)
+    parser.add_argument('--lr_drop', default=8, type=int)
     parser.add_argument('--clip_max_norm', default=0.1, type=float,
                         help='gradient clipping max norm')
 
     # Model parameters
     parser.add_argument('--frozen_weights', type=str, default=None,
                         help="Path to the pretrained model. If set, only the mask head will be trained")
+    # >>> loda pretrained model >>>
+    parser.add_argument('--pretrained', type=str, default="./model_pretrain/detr-r101-panoptic-40021d53.pth",
+                        help='Path to pretrained model weights')
+    parser.add_argument('--finetune_mode', action='store_true',
+                        help='Use finetune mode with smaller learning rate')
+    # <<< loda pretrained model <<<
     # * Backbone
-    parser.add_argument('--backbone', default='resnet50', type=str,
+    parser.add_argument('--backbone', default='resnet101', type=str,
                         help="Name of the convolutional backbone to use")
     parser.add_argument('--dilation', action='store_true',
                         help="If true, we replace stride with dilation in the last convolutional block (DC5)")
@@ -80,11 +87,11 @@ def get_args_parser():
 
     # dataset parameters
     parser.add_argument('--dataset_file', default='coco')
-    parser.add_argument('--coco_path', type=str)
+    parser.add_argument('--coco_path', type=str, default="./UAVDT_Faster_COCO")
     parser.add_argument('--coco_panoptic_path', type=str)
     parser.add_argument('--remove_difficult', action='store_true')
 
-    parser.add_argument('--output_dir', default='',
+    parser.add_argument('--output_dir', default='output_10epochs',
                         help='path where to save, empty for no saving')
     parser.add_argument('--device', default='cuda',
                         help='device to use for training / testing')
@@ -93,7 +100,7 @@ def get_args_parser():
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')
     parser.add_argument('--eval', action='store_true')
-    parser.add_argument('--num_workers', default=2, type=int)
+    parser.add_argument('--num_workers', default=12, type=int)
 
     # distributed training parameters
     parser.add_argument('--world_size', default=1, type=int,
@@ -120,6 +127,43 @@ def main(args):
 
     model, criterion, postprocessors = build_model(args)
     model.to(device)
+
+    # >>> loda pretrained model >>>
+    # === 新增：加载预训练权重 ===
+    if args.pretrained:
+        print(f"Loading pretrained weights from {args.pretrained}")
+        try:
+            checkpoint = torch.load(args.pretrained, map_location='cpu')
+
+            # 检查checkpoint结构
+            if 'model' in checkpoint:
+                pretrained_dict = checkpoint['model']
+            else:
+                pretrained_dict = checkpoint
+
+            # 更安全的键过滤
+            model_dict = model.state_dict()
+
+            # 1. 过滤掉不匹配的键
+            pretrained_dict = {k: v for k, v in pretrained_dict.items()
+                               if k in model_dict and model_dict[k].shape == v.shape}
+
+            # 2. 更新模型参数
+            model_dict.update(pretrained_dict)
+            model.load_state_dict(model_dict)
+
+            print(f"Successfully loaded {len(pretrained_dict)}/{len(model_dict)} parameters from pretrained model")
+
+        except Exception as e:
+            print(f"Error loading pretrained model: {e}")
+            print("Continuing without pretrained weights")
+
+    # === 新增：微调模式调整学习率 ===
+    if args.finetune_mode:
+        args.lr = args.lr * 0.1  # 微调时使用更小的学习率
+        args.lr_backbone = args.lr_backbone * 0.1
+        print(f"Finetune mode: adjusting LR to {args.lr}, backbone LR to {args.lr_backbone}")
+    # <<< loda pretrained model <<<
 
     model_without_ddp = model
     if args.distributed:
@@ -190,7 +234,7 @@ def main(args):
 
     print("Start training")
     start_time = time.time()
-    for epoch in range(args.start_epoch, args.epochs):
+    for epoch in tqdm(range(args.start_epoch, args.epochs)):
         if args.distributed:
             sampler_train.set_epoch(epoch)
         train_stats = train_one_epoch(
