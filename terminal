@@ -1,1 +1,1 @@
-python main.py --resume="detr_r50_11.pth"
+python main.py

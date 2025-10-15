@@ -25,19 +25,14 @@ def get_args_parser():
     parser.add_argument('--batch_size', default=4, type=int)
     parser.add_argument('--weight_decay', default=1e-4, type=float)
     parser.add_argument('--epochs', default=10, type=int)
-    parser.add_argument('--lr_drop', default=8, type=int)
+    parser.add_argument('--lr_drop', default=7, type=int)
     parser.add_argument('--clip_max_norm', default=0.1, type=float,
                         help='gradient clipping max norm')
 
     # Model parameters
     parser.add_argument('--frozen_weights', type=str, default=None,
                         help="Path to the pretrained model. If set, only the mask head will be trained")
-    # >>> loda pretrained model >>>
-    parser.add_argument('--pretrained', type=str, default="./model_pretrain/detr-r101-panoptic-40021d53.pth",
-                        help='Path to pretrained model weights')
-    parser.add_argument('--finetune_mode', action='store_true',
-                        help='Use finetune mode with smaller learning rate')
-    # <<< loda pretrained model <<<
+
     # * Backbone
     parser.add_argument('--backbone', default='resnet101', type=str,
                         help="Name of the convolutional backbone to use")
@@ -96,7 +91,7 @@ def get_args_parser():
     parser.add_argument('--device', default='cuda',
                         help='device to use for training / testing')
     parser.add_argument('--seed', default=42, type=int)
-    parser.add_argument('--resume', default='./model_pretrain/detr101_2'
+    parser.add_argument('--resume', default='./model_pretrain/detr-r101_2.pth'
                                             '', help='resume from checkpoint')
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')
@@ -128,43 +123,6 @@ def main(args):
 
     model, criterion, postprocessors = build_model(args)
     model.to(device)
-
-    # # >>> loda pretrained model >>>
-    # # === 新增：加载预训练权重 ===
-    # if args.pretrained:
-    #     print(f"Loading pretrained weights from {args.pretrained}")
-    #     try:
-    #         checkpoint = torch.load(args.pretrained, map_location='cpu')
-    #
-    #         # 检查checkpoint结构
-    #         if 'model' in checkpoint:
-    #             pretrained_dict = checkpoint['model']
-    #         else:
-    #             pretrained_dict = checkpoint
-    #
-    #         # 更安全的键过滤
-    #         model_dict = model.state_dict()
-    #
-    #         # 1. 过滤掉不匹配的键
-    #         pretrained_dict = {k: v for k, v in pretrained_dict.items()
-    #                            if k in model_dict and model_dict[k].shape == v.shape}
-    #
-    #         # 2. 更新模型参数
-    #         model_dict.update(pretrained_dict)
-    #         model.load_state_dict(model_dict)
-    #
-    #         print(f"Successfully loaded {len(pretrained_dict)}/{len(model_dict)} parameters from pretrained model")
-    #
-    #     except Exception as e:
-    #         print(f"Error loading pretrained model: {e}")
-    #         print("Continuing without pretrained weights")
-    #
-    # # === 新增：微调模式调整学习率 ===
-    # if args.finetune_mode:
-    #     args.lr = args.lr * 0.1  # 微调时使用更小的学习率
-    #     args.lr_backbone = args.lr_backbone * 0.1
-    #     print(f"Finetune mode: adjusting LR to {args.lr}, backbone LR to {args.lr_backbone}")
-    # # <<< loda pretrained model <<<
 
     model_without_ddp = model
     if args.distributed:
@@ -245,7 +203,7 @@ def main(args):
         if args.output_dir:
             checkpoint_paths = [output_dir / 'checkpoint.pth']
             # extra checkpoint before LR drop and every 100 epochs
-            if (epoch + 1) % 5 == 0:
+            if (epoch + 1) % 1 == 0:
                 checkpoint_paths.append(output_dir / f'checkpoint{epoch:04}.pth')
             for checkpoint_path in checkpoint_paths:
                 utils.save_on_master({
@@ -256,12 +214,12 @@ def main(args):
                     'args': args,
                 }, checkpoint_path)
 
-        test_stats, coco_evaluator = evaluate(
-            model, criterion, postprocessors, data_loader_val, base_ds, device, args.output_dir
-        )
+        # test_stats, coco_evaluator = evaluate(
+        #     model, criterion, postprocessors, data_loader_val, base_ds, device, args.output_dir
+        # )
 
         log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
-                     **{f'test_{k}': v for k, v in test_stats.items()},
+                     # **{f'test_{k}': v for k, v in test_stats.items()},
                      'epoch': epoch,
                      'n_parameters': n_parameters}
 
@@ -269,16 +227,16 @@ def main(args):
             with (output_dir / "log.txt").open("a") as f:
                 f.write(json.dumps(log_stats) + "\n")
 
-            # for evaluation logs
-            if coco_evaluator is not None:
-                (output_dir / 'eval').mkdir(exist_ok=True)
-                if "bbox" in coco_evaluator.coco_eval:
-                    filenames = ['latest.pth']
-                    if epoch % 50 == 0:
-                        filenames.append(f'{epoch:03}.pth')
-                    for name in filenames:
-                        torch.save(coco_evaluator.coco_eval["bbox"].eval,
-                                   output_dir / "eval" / name)
+            # # for evaluation logs
+            # if coco_evaluator is not None:
+            #     (output_dir / 'eval').mkdir(exist_ok=True)
+            #     if "bbox" in coco_evaluator.coco_eval:
+            #         filenames = ['latest.pth']
+            #         if epoch % 50 == 0:
+            #             filenames.append(f'{epoch:03}.pth')
+            #         for name in filenames:
+            #             torch.save(coco_evaluator.coco_eval["bbox"].eval,
+            #                        output_dir / "eval" / name)
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
