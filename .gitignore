@@ -20,3 +20,4 @@ not_tracked_dir/
 UAVDT_Faster_COCO/
 output_10epochs/
 log/
+model_pretrain/
