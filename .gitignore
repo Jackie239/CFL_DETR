@@ -19,3 +19,4 @@ not_tracked_dir/
 .idea/
 UAVDT_Faster_COCO/
 output_10epochs/
+log/

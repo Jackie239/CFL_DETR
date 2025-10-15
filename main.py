@@ -24,7 +24,7 @@ def get_args_parser():
     parser.add_argument('--lr_backbone', default=1e-5, type=float)
     parser.add_argument('--batch_size', default=4, type=int)
     parser.add_argument('--weight_decay', default=1e-4, type=float)
-    parser.add_argument('--epochs', default=10, type=int)
+    parser.add_argument('--epochs', default=1, type=int)
     parser.add_argument('--lr_drop', default=8, type=int)
     parser.add_argument('--clip_max_norm', default=0.1, type=float,
                         help='gradient clipping max norm')
@@ -128,42 +128,42 @@ def main(args):
     model, criterion, postprocessors = build_model(args)
     model.to(device)
 
-    # >>> loda pretrained model >>>
-    # === 新增：加载预训练权重 ===
-    if args.pretrained:
-        print(f"Loading pretrained weights from {args.pretrained}")
-        try:
-            checkpoint = torch.load(args.pretrained, map_location='cpu')
-
-            # 检查checkpoint结构
-            if 'model' in checkpoint:
-                pretrained_dict = checkpoint['model']
-            else:
-                pretrained_dict = checkpoint
-
-            # 更安全的键过滤
-            model_dict = model.state_dict()
-
-            # 1. 过滤掉不匹配的键
-            pretrained_dict = {k: v for k, v in pretrained_dict.items()
-                               if k in model_dict and model_dict[k].shape == v.shape}
-
-            # 2. 更新模型参数
-            model_dict.update(pretrained_dict)
-            model.load_state_dict(model_dict)
-
-            print(f"Successfully loaded {len(pretrained_dict)}/{len(model_dict)} parameters from pretrained model")
-
-        except Exception as e:
-            print(f"Error loading pretrained model: {e}")
-            print("Continuing without pretrained weights")
-
-    # === 新增：微调模式调整学习率 ===
-    if args.finetune_mode:
-        args.lr = args.lr * 0.1  # 微调时使用更小的学习率
-        args.lr_backbone = args.lr_backbone * 0.1
-        print(f"Finetune mode: adjusting LR to {args.lr}, backbone LR to {args.lr_backbone}")
-    # <<< loda pretrained model <<<
+    # # >>> loda pretrained model >>>
+    # # === 新增：加载预训练权重 ===
+    # if args.pretrained:
+    #     print(f"Loading pretrained weights from {args.pretrained}")
+    #     try:
+    #         checkpoint = torch.load(args.pretrained, map_location='cpu')
+    #
+    #         # 检查checkpoint结构
+    #         if 'model' in checkpoint:
+    #             pretrained_dict = checkpoint['model']
+    #         else:
+    #             pretrained_dict = checkpoint
+    #
+    #         # 更安全的键过滤
+    #         model_dict = model.state_dict()
+    #
+    #         # 1. 过滤掉不匹配的键
+    #         pretrained_dict = {k: v for k, v in pretrained_dict.items()
+    #                            if k in model_dict and model_dict[k].shape == v.shape}
+    #
+    #         # 2. 更新模型参数
+    #         model_dict.update(pretrained_dict)
+    #         model.load_state_dict(model_dict)
+    #
+    #         print(f"Successfully loaded {len(pretrained_dict)}/{len(model_dict)} parameters from pretrained model")
+    #
+    #     except Exception as e:
+    #         print(f"Error loading pretrained model: {e}")
+    #         print("Continuing without pretrained weights")
+    #
+    # # === 新增：微调模式调整学习率 ===
+    # if args.finetune_mode:
+    #     args.lr = args.lr * 0.1  # 微调时使用更小的学习率
+    #     args.lr_backbone = args.lr_backbone * 0.1
+    #     print(f"Finetune mode: adjusting LR to {args.lr}, backbone LR to {args.lr_backbone}")
+    # # <<< loda pretrained model <<<
 
     model_without_ddp = model
     if args.distributed:
