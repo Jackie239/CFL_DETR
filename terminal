@@ -1,1 +1,2 @@
 python main.py
+python main.py --batch_size 4 --no_aux_loss --eval --resume ./output/detr_uavdt/checkpoint0007.pth --coco_path ./UAVDT_Faster_COCO
