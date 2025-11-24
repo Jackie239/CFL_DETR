@@ -184,49 +184,49 @@ def main(args):
             lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
             args.start_epoch = checkpoint['epoch'] + 1
 
-    # if args.eval:
-    #     test_stats, coco_evaluator = evaluate(model, criterion, postprocessors,
-    #                                           data_loader_val, base_ds, device, args.output_dir)
-    #     if args.output_dir:
-    #         utils.save_on_master(coco_evaluator.coco_eval["bbox"].eval, output_dir / "eval.pth")
-    #     return
     if args.eval:
-        # 前向传播前重置显存统计
-        if args.device == "cuda":
-            torch.cuda.reset_peak_memory_stats()
-
-        # 输入数据示例（取验证集的一个 batch）
-        inputs = next(iter(data_loader_val))
-        samples, targets = inputs
-        samples = samples.to(device)
-
-        # 计时开始
-        start = time.time()
-        with torch.no_grad():
-            outputs = model(samples)
-        if args.device == "cuda":
-            torch.cuda.synchronize()
-        end = time.time()
-
-        infer_time = (end - start) * 1000  # ms
-        fwd_mem = torch.cuda.max_memory_allocated() / (1024 ** 2) if args.device == "cuda" else None
-
-        # FLOPs 和参数量
-        from thop import profile
-        flops, params = profile(model, inputs=(samples,))
-
-        print(f"推理时间: {infer_time:.2f} ms")
-        if fwd_mem is not None:
-            print(f"前向显存峰值: {fwd_mem:.1f} MB")
-        print(f"FLOPs: {flops / 1e9:.2f} G")
-        print(f"参数量: {params / 1e6:.2f} M")
-
-        # 保留原有评估逻辑
         test_stats, coco_evaluator = evaluate(model, criterion, postprocessors,
                                               data_loader_val, base_ds, device, args.output_dir)
         if args.output_dir:
             utils.save_on_master(coco_evaluator.coco_eval["bbox"].eval, output_dir / "eval.pth")
         return
+    # if args.eval:
+    #     # 前向传播前重置显存统计
+    #     if args.device == "cuda":
+    #         torch.cuda.reset_peak_memory_stats()
+    #
+    #     # 输入数据示例（取验证集的一个 batch）
+    #     inputs = next(iter(data_loader_val))
+    #     samples, targets = inputs
+    #     samples = samples.to(device)
+    #
+    #     # 计时开始
+    #     start = time.time()
+    #     with torch.no_grad():
+    #         outputs = model(samples)
+    #     if args.device == "cuda":
+    #         torch.cuda.synchronize()
+    #     end = time.time()
+    #
+    #     infer_time = (end - start) * 1000  # ms
+    #     fwd_mem = torch.cuda.max_memory_allocated() / (1024 ** 2) if args.device == "cuda" else None
+    #
+    #     # FLOPs 和参数量
+    #     from thop import profile
+    #     flops, params = profile(model, inputs=(samples,))
+    #
+    #     print(f"推理时间: {infer_time:.2f} ms")
+    #     if fwd_mem is not None:
+    #         print(f"前向显存峰值: {fwd_mem:.1f} MB")
+    #     print(f"FLOPs: {flops / 1e9:.2f} G")
+    #     print(f"参数量: {params / 1e6:.2f} M")
+    #
+    #     # 保留原有评估逻辑
+    #     test_stats, coco_evaluator = evaluate(model, criterion, postprocessors,
+    #                                           data_loader_val, base_ds, device, args.output_dir)
+    #     if args.output_dir:
+    #         utils.save_on_master(coco_evaluator.coco_eval["bbox"].eval, output_dir / "eval.pth")
+    #     return
 
     print("Start training")
     start_time = time.time()
